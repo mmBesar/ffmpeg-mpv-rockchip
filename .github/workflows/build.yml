@@ -196,3 +196,13 @@ jobs:
         run: |
           git tag "built/${{ needs.check.outputs.build_key }}"
           git push origin "built/${{ needs.check.outputs.build_key }}"
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "built/${{ needs.check.outputs.build_key }}" \
+            /tmp/artifacts/*.deb \
+            --title "ffmpeg-mpv-rockchip ${{ needs.check.outputs.build_key }}" \
+            --notes "FFmpeg 8.1 + mpv v0.40.0 with RK3588 HWA (rkmpp, rkrga, vaapi)"
