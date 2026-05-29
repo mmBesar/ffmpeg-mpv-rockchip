@@ -1,4 +1,4 @@
-name: Build ffmpeg with RK3588 HWA
+name: Build ffmpeg + mpv with RK3588 HWA
 
 on:
   push:
@@ -9,11 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [arm64]
-        target: [linuxarm64-gpl]
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - uses: actions/checkout@v4
@@ -27,14 +23,16 @@ jobs:
             libdrm-dev libva-dev libvulkan-dev \
             libx11-dev libegl1-mesa-dev libgbm-dev \
             libdav1d-dev libopus-dev libmp3lame-dev libvpx-dev \
-            libx264-dev libx265-dev \
+            libx264-dev libx265-dev libaom-dev \
             libass-dev libfreetype-dev libfontconfig-dev \
             libfribidi-dev libharfbuzz-dev \
             libtheora-dev libwebp-dev \
             libzimg-dev libxml2-dev zlib1g-dev libssl-dev \
             libbluray-dev libopenmpt-dev libchromaprint-dev \
-            libfftw3-dev libzvbi-dev libsoxr-dev \
-            liblzma-dev libbz2-dev libsnappy-dev libgmp-dev libgnutls28-dev
+            libfftw3-dev libzvibi-dev libsoxr-dev \
+            liblzma-dev libbz2-dev libsnappy-dev libgmp-dev libgnutls28-dev \
+            libwayland-dev libxpresent-dev libxext-dev libxrandr-dev \
+            libxinerama-dev libxcursor-dev libxi-dev
 
       - name: Build MPP from source (Jellyfin fork)
         run: |
@@ -47,7 +45,8 @@ jobs:
             -DBUILD_TEST=OFF -DBUILD_SHARED_LIBS=ON ..
           make -j$(nproc)
           sudo make install
-          sudo ln -sf rockchip_mpp.pc /usr/lib/aarch64-linux-gnu/pkgconfig/rockchip_mpp.pc 2>/dev/null || true
+          echo "Libs.private: -lstdc++" | \
+            sudo tee -a /usr/lib/aarch64-linux-gnu/pkgconfig/rockchip_mpp.pc
 
       - name: Build RGA from source (Jellyfin fork)
         run: |
@@ -60,6 +59,8 @@ jobs:
             -Dlibdrm=false -Dlibrga_demo=false ..
           ninja -j$(nproc)
           sudo ninja install
+          echo "Libs.private: -lstdc++" | \
+            sudo tee -a /usr/lib/aarch64-linux-gnu/pkgconfig/librga.pc
 
       - name: Clone Jellyfin ffmpeg
         run: |
@@ -80,6 +81,7 @@ jobs:
           ./configure \
             --prefix=/usr/local \
             --extra-version="rockchip-rk3588" \
+            --enable-shared \
             --enable-gpl --enable-version3 \
             --disable-unstable --disable-ffplay \
             --disable-debug --disable-doc --disable-sdl2 \
@@ -87,7 +89,7 @@ jobs:
             --enable-lto=auto --enable-runtime-cpudetect \
             --enable-rkmpp --enable-rkrga \
             --enable-vaapi --enable-vulkan --enable-libdrm \
-            --enable-libx264 --enable-libx265 \
+            --enable-libx264 --enable-libx265 --enable-libaom \
             --enable-libvpx --enable-libdav1d \
             --enable-libopus --enable-libmp3lame \
             --enable-libtheora --enable-libwebp --enable-libzimg \
@@ -103,7 +105,7 @@ jobs:
           cd /tmp/ffmpeg-source
           make -j$(nproc)
 
-      - name: Package artifacts
+      - name: Package ffmpeg artifacts
         run: |
           cd /tmp/ffmpeg-source
           mkdir -p /tmp/artifacts
@@ -111,7 +113,7 @@ jobs:
           cd /tmp/artifacts
           tar cJf /tmp/ffmpeg-rockchip-linuxarm64-gpl.tar.xz .
 
-      - name: Upload artifacts
+      - name: Upload ffmpeg artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-rockchip-linuxarm64-gpl
