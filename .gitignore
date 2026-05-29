@@ -1,0 +1,32 @@
+# Build artifacts
+ffmpeg/
+ffmpeg-build/
+build/
+*.tar.*
+*.deb
+*.zip
+*.xz
+
+# Temp build dirs
+/tmp/
+/tmp/*
+
+# mpv build
+mpv-source/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Session memory
+AGENTS.md
+
+# Temp
+/tmp/
+*.log
