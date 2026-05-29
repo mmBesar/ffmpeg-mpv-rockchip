@@ -129,7 +129,7 @@ jobs:
           mkdir -p /tmp/artifacts
           cd /tmp/ffmpeg
           sudo make install DESTDIR=/tmp/ffmpeg-deb
-          mkdir -p /tmp/ffmpeg-deb/DEBIAN
+          sudo mkdir -p /tmp/ffmpeg-deb/DEBIAN
           cat > /tmp/ffmpeg-deb/DEBIAN/control <<'CONTROL'
           Package: ffmpeg-rockchip
           Version: 8.1.1
@@ -161,7 +161,7 @@ jobs:
         run: |
           cd /tmp/mpv
           sudo DESTDIR=/tmp/mpv-deb ninja -C build install
-          mkdir -p /tmp/mpv-deb/DEBIAN
+          sudo mkdir -p /tmp/mpv-deb/DEBIAN
           cat > /tmp/mpv-deb/DEBIAN/control <<'CONTROL'
           Package: mpv-rockchip
           Version: 0.40.0
