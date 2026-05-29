@@ -37,7 +37,8 @@ install_deps() {
     info "Installing system dependencies..."
     sudo apt-get update -qq
     sudo apt-get install -y -qq gcc g++ make cmake meson ninja-build pkg-config yasm nasm git wget \
-        libdrm-dev libva-dev libvulkan-dev libplacebo-dev liblua5.2-dev libdisplay-info-dev wayland-protocols libx11-dev libegl1-mesa-dev libgbm-dev \
+        libdrm-dev libva-dev libvulkan-dev libplacebo-dev liblua5.2-dev libdisplay-info-dev \
+        wayland-protocols libxkbcommon-dev libxss-dev libx11-dev libegl1-mesa-dev libgbm-dev \
         libdav1d-dev libopus-dev libmp3lame-dev libvpx-dev \
         libx264-dev libx265-dev libaom-dev \
         libass-dev libfreetype-dev libfontconfig-dev \
