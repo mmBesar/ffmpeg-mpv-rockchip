@@ -95,15 +95,6 @@ jobs:
 
       - name: Build ffmpeg
         run: |
-          # Try to install vulkan; auto-detect at configure time so build
-          # proceeds regardless (CI runner may not have GPU stacks available)
-          sudo apt-get install -y libvulkan-dev 2>/dev/null || true
-          if pkg-config --exists vulkan 2>/dev/null; then
-            VULKAN="--enable-vulkan"
-          else
-            VULKAN="--disable-vulkan"
-            echo "::warning::Vulkan not found — building without vulkan support"
-          fi
           rm -rf /tmp/ffmpeg
           git clone --depth 1 --branch jellyfin \
             https://github.com/jellyfin/jellyfin-ffmpeg.git /tmp/ffmpeg
@@ -120,7 +111,7 @@ jobs:
             --disable-libxcb --disable-xlib \
             --enable-lto=auto --enable-runtime-cpudetect \
             --enable-rkmpp --enable-rkrga \
-            --enable-vaapi "$VULKAN" --enable-libdrm \
+            --enable-vaapi --disable-vulkan --enable-libdrm \
             --enable-libx264 --enable-libx265 --enable-libaom \
             --enable-libvpx --enable-libdav1d \
             --enable-libopus --enable-libmp3lame \
