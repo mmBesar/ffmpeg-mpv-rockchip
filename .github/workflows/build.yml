@@ -49,7 +49,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             meson ninja-build pkg-config cmake \
-            yasm nasm \
+            yasm nasm checkinstall \
             libdrm-dev libva-dev libvulkan-dev \
             libx11-dev libegl1-mesa-dev libgbm-dev \
             libdav1d-dev libopus-dev libmp3lame-dev libvpx-dev \
@@ -121,6 +121,24 @@ jobs:
             --enable-bzlib --enable-lzma --enable-zlib
           make -j$(nproc)
 
+      - name: Package ffmpeg .deb
+        run: |
+          cd /tmp/ffmpeg
+          sudo make install DESTDIR=/tmp/ffmpeg-deb
+          mkdir -p /tmp/ffmpeg-deb/DEBIAN
+          cat > /tmp/ffmpeg-deb/DEBIAN/control <<'CONTROL'
+Package: ffmpeg-rockchip
+Version: 8.1.1
+Section: video
+Priority: optional
+Architecture: arm64
+Depends: libdrm2, libva2, libvulkan1, libx264-164, libx265-209, libvpx9, libdav1d7, libaom3, libopus0, libmp3lame0, libass9, libfreetype6, libfontconfig1, libfribidi0, libtheora0, libwebp7, libzimg2, libbluray2, libopenmpt0, libsoxr0, libzvbi0, libssl3, libxml2, libsnappy1v5, liblzma5, libbz2-1.0, zlib1g
+Maintainer: ffmpeg-rockchip
+Description: FFmpeg 8.1 with RK3588 hardware acceleration (rkmpp, rkrga, vaapi)
+CONTROL
+          sudo chown -R root:root /tmp/ffmpeg-deb
+          sudo dpkg-deb --build /tmp/ffmpeg-deb /tmp/artifacts/ffmpeg-rockchip_8.1.1_arm64.deb
+
       - name: Build mpv
         run: |
           git clone --depth 1 --branch v0.40.0 \
@@ -134,19 +152,29 @@ jobs:
             --buildtype=release --prefix=/usr/local
           ninja -C build -j$(nproc)
 
-      - name: Package artifacts
+      - name: Package mpv .deb
         run: |
-          mkdir -p /tmp/artifacts/usr/local
-          DESTDIR=/tmp/artifacts make -C /tmp/ffmpeg install
-          DESTDIR=/tmp/artifacts ninja -C /tmp/mpv/build install
-          cd /tmp/artifacts
-          tar cJf /tmp/ffmpeg-mpv-rockchip-linuxarm64-gpl.tar.xz .
+          cd /tmp/mpv
+          sudo DESTDIR=/tmp/mpv-deb ninja -C build install
+          mkdir -p /tmp/mpv-deb/DEBIAN
+          cat > /tmp/mpv-deb/DEBIAN/control <<'CONTROL'
+Package: mpv-rockchip
+Version: 0.40.0
+Section: video
+Priority: optional
+Architecture: arm64
+Depends: ffmpeg-rockchip (= 8.1.1), libdrm2, libva2, libegl1, libwayland-client0, libx11-6
+Maintainer: mpv-rockchip
+Description: mpv v0.40.0 built against ffmpeg-rockchip with rkmpp HW decode
+CONTROL
+          sudo chown -R root:root /tmp/mpv-deb
+          sudo dpkg-deb --build /tmp/mpv-deb /tmp/artifacts/mpv-rockchip_0.40.0_arm64.deb
 
-      - name: Upload artifacts
+      - name: Upload .deb artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-mpv-rockchip-linuxarm64-gpl
-          path: /tmp/ffmpeg-mpv-rockchip-linuxarm64-gpl.tar.xz
+          name: ffmpeg-mpv-rockchip-debs
+          path: /tmp/artifacts/*.deb
 
       - name: Record build with git tag
         if: github.event_name == 'push'

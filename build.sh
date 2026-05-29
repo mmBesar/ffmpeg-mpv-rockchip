@@ -34,7 +34,7 @@ check_deps() {
 }
 
 install_deps() {
-    info "Installing system dependencies (requires sudo)..."
+    info "Installing system dependencies..."
     sudo apt-get update -qq
     sudo apt-get install -y -qq gcc g++ make cmake meson ninja-build pkg-config yasm nasm git wget \
         libdrm-dev libva-dev libvulkan-dev libx11-dev libegl1-mesa-dev libgbm-dev \
@@ -46,8 +46,8 @@ install_deps() {
         libbluray-dev libopenmpt-dev libchromaprint-dev \
         libfftw3-dev libzvbi-dev libsoxr-dev \
         liblzma-dev libbz2-dev libsnappy-dev libgmp-dev libgnutls28-dev \
-        libwayland-dev libxpresent-dev libxext-dev libxrandr-dev libxinerama-dev \
-        libxcursor-dev libxi-dev
+        libwayland-dev libxpresent-dev libxext-dev libxrandr-dev \
+        libxinerama-dev libxcursor-dev libxi-dev
     info "System dependencies installed"
 }
 
@@ -86,7 +86,7 @@ clone_source() {
         info "Updating ffmpeg source..."
         cd "$SOURCE_DIR" && git pull
     else
-        info "Cloning Jellyfin ffmpeg ($FFMPEG_BRANCH)..."
+        info "Cloning Jellyfin ffmpeg..."
         git clone --depth 1 --branch "$FFMPEG_BRANCH" "$FFMPEG_REPO" "$SOURCE_DIR"
     fi
 }
@@ -108,7 +108,7 @@ apply_patches() {
     [ "$fail" -gt 0 ] && error "Some patches failed!" && exit 1
 }
 
-configure_build() {
+configure_ffmpeg() {
     info "Configuring ffmpeg..."
     cd "$SOURCE_DIR"
     ./configure \
@@ -137,7 +137,7 @@ configure_build() {
 }
 
 build_ffmpeg() {
-    info "Building ffmpeg ($JOBS jobs)..."
+    info "Building ffmpeg..."
     cd "$SOURCE_DIR"
     make -j"$JOBS"
     info "ffmpeg build complete!"
@@ -148,36 +148,67 @@ install_ffmpeg() {
     cd "$SOURCE_DIR"
     sudo make install
     sudo ldconfig 2>/dev/null || true
-    info "ffmpeg installed to /usr/local"
+}
+
+package_ffmpeg_deb() {
+    info "Packaging ffmpeg .deb..."
+    cd "$SOURCE_DIR"
+    sudo make install DESTDIR=/tmp/ffmpeg-deb
+    mkdir -p /tmp/ffmpeg-deb/DEBIAN
+    cat > /tmp/ffmpeg-deb/DEBIAN/control <<CONTROL
+Package: ffmpeg-rockchip
+Version: 8.1.1
+Section: video
+Priority: optional
+Architecture: arm64
+Depends: libdrm2, libva2, libvulkan1, libx264-164, libx265-209, libvpx9, libdav1d7, libaom3, libopus0, libmp3lame0, libass9, libfreetype6, libfontconfig1, libfribidi0, libtheora0, libwebp7, libzimg2, libbluray2, libopenmpt0, libsoxr0, libzvbi0, libssl3, libxml2, libsnappy1v5, liblzma5, libbz2-1.0, zlib1g
+Maintainer: ffmpeg-rockchip
+Description: FFmpeg 8.1 with RK3588 hardware acceleration (rkmpp, rkrga, vaapi)
+CONTROL
+    sudo chown -R root:root /tmp/ffmpeg-deb
+    sudo dpkg-deb --build /tmp/ffmpeg-deb "$REPO_DIR/ffmpeg-rockchip_8.1.1_arm64.deb"
+    info "Created: ffmpeg-rockchip_8.1.1_arm64.deb"
 }
 
 build_mpv() {
-    info "Building mpv ($MPV_BRANCH)..."
+    info "Building mpv..."
     local mpv_src=/tmp/mpv-source
-    if [ -d "$mpv_src" ]; then
-        cd "$mpv_src" && git fetch --tags && git checkout "$MPV_BRANCH"
-    else
-        git clone --depth 1 --branch "$MPV_BRANCH" "$MPV_REPO" "$mpv_src"
-    fi
-
+    [ -d "$mpv_src" ] && rm -rf "$mpv_src"
+    git clone --depth 1 --branch "$MPV_BRANCH" "$MPV_REPO" "$mpv_src"
     cd "$mpv_src"
-    # Create mpv config for HW decode
-    mkdir -p /home/"$SUDO_USER"/.config/mpv 2>/dev/null || true
-    mkdir -p ~/.config/mpv
-    echo "hwdec=rkmpp-copy" > ~/.config/mpv/mpv.conf
-
     meson setup build \
         -Dlibmpv=true -Dcplayer=true \
         -Dlua=enabled -Dlibplacebo=disabled \
         -Ddrm=enabled -Degl-drm=enabled \
         -Dx11=enabled -Dwayland=enabled \
-        --buildtype=release \
-        --prefix=/usr/local
-
+        --buildtype=release --prefix=/usr/local
     ninja -C build -j"$JOBS"
     sudo ninja -C build install
     sudo ldconfig 2>/dev/null || true
+    mkdir -p ~/.config/mpv
+    echo "hwdec=rkmpp-copy" > ~/.config/mpv/mpv.conf
     info "mpv installed to /usr/local"
+}
+
+package_mpv_deb() {
+    info "Packaging mpv .deb..."
+    local mpv_src=/tmp/mpv-source
+    cd "$mpv_src"
+    sudo DESTDIR=/tmp/mpv-deb ninja -C build install
+    mkdir -p /tmp/mpv-deb/DEBIAN
+    cat > /tmp/mpv-deb/DEBIAN/control <<CONTROL
+Package: mpv-rockchip
+Version: 0.40.0
+Section: video
+Priority: optional
+Architecture: arm64
+Depends: ffmpeg-rockchip (= 8.1.1), libdrm2, libva2, libegl1, libwayland-client0, libx11-6
+Maintainer: mpv-rockchip
+Description: mpv v0.40.0 built against ffmpeg-rockchip with rkmpp HW decode
+CONTROL
+    sudo chown -R root:root /tmp/mpv-deb
+    sudo dpkg-deb --build /tmp/mpv-deb "$REPO_DIR/mpv-rockchip_0.40.0_arm64.deb"
+    info "Created: mpv-rockchip_0.40.0_arm64.deb"
 }
 
 verify_build() {
@@ -218,7 +249,9 @@ test_hw_decode() {
 
 clean_all() {
     info "Cleaning build artifacts..."
-    rm -rf "$SOURCE_DIR" /tmp/rkmpp-build /tmp/rkrga-build /tmp/mpv-source /tmp/test-h264.mp4
+    rm -rf "$SOURCE_DIR" /tmp/rkmpp-build /tmp/rkrga-build /tmp/mpv-source \
+          /tmp/ffmpeg-deb /tmp/mpv-deb /tmp/test-h264.mp4
+    rm -f "$REPO_DIR"/*.deb
     info "Clean complete"
 }
 
@@ -227,20 +260,23 @@ usage() {
 Usage: $0 [command]
 
 Commands:
-  deps       Check dependencies
-  deps-all   Install all system dependencies (requires sudo)
-  mpp        Build MPP from Jellyfin fork
-  rga        Build RGA from Jellyfin fork
-  source     Clone/update ffmpeg source
-  patches    Apply Jellyfin patches
-  configure  Configure ffmpeg
-  build      Compile ffmpeg
-  install    Install ffmpeg to /usr/local
-  mpv        Build and install mpv
-  verify     Verify installation
-  test       Test HW decode
-  all        Full build chain (deps→mpp→rga→ffmpeg→mpv→verify→test)
-  clean      Remove all build artifacts
+  deps         Check dependencies
+  deps-all     Install all system dependencies (sudo)
+  mpp          Build MPP from Jellyfin fork
+  rga          Build RGA from Jellyfin fork
+  source       Clone/update ffmpeg source
+  patches      Apply Jellyfin patches
+  configure    Configure ffmpeg
+  build        Compile ffmpeg
+  install      Install ffmpeg to /usr/local
+  deb-ffmpeg   Package ffmpeg as .deb
+  mpv          Build and install mpv
+  deb-mpv      Package mpv as .deb
+  debs         Build both .deb packages
+  verify       Verify installation
+  test         Test HW decode
+  all          Full build chain (deps->mpp->rga->ffmpeg->mpv->verify->test)
+  clean        Remove all build artifacts
 EOF
 }
 
@@ -252,7 +288,7 @@ case "$cmd" in
         build_rga
         clone_source
         apply_patches
-        configure_build
+        configure_ffmpeg
         build_ffmpeg
         install_ffmpeg
         build_mpv
@@ -260,18 +296,25 @@ case "$cmd" in
         test_hw_decode
         info "Full build complete! ffmpeg + mpv with RK3588 HWA installed."
         ;;
-    deps)     check_deps ;;
-    deps-all) install_deps ;;
-    mpp)      build_mpp ;;
-    rga)      build_rga ;;
-    source)   clone_source ;;
-    patches)  apply_patches ;;
-    configure) configure_build ;;
-    build)    build_ffmpeg ;;
-    install)  install_ffmpeg ;;
-    mpv)      build_mpv ;;
-    verify)   verify_build ;;
-    test)     test_hw_decode ;;
-    clean)    clean_all ;;
-    *)        usage; exit 1 ;;
+    deps)       check_deps ;;
+    deps-all)   install_deps ;;
+    mpp)        build_mpp ;;
+    rga)        build_rga ;;
+    source)     clone_source ;;
+    patches)    apply_patches ;;
+    configure)  configure_ffmpeg ;;
+    build)      build_ffmpeg ;;
+    install)    install_ffmpeg ;;
+    deb-ffmpeg) package_ffmpeg_deb ;;
+    mpv)        build_mpv ;;
+    deb-mpv)    package_mpv_deb ;;
+    debs)
+        package_ffmpeg_deb
+        package_mpv_deb
+        info ".deb packages created in $REPO_DIR"
+        ;;
+    verify)     verify_build ;;
+    test)       test_hw_decode ;;
+    clean)      clean_all ;;
+    *)          usage; exit 1 ;;
 esac
