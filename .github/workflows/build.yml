@@ -66,10 +66,11 @@ jobs:
 
       - name: Build MPP (Jellyfin fork)
         run: |
+          rm -rf /tmp/rkmpp
           git clone --depth 1 --branch jellyfin-mpp-next \
             https://github.com/nyanmisaka/rk-mirrors.git /tmp/rkmpp
           cd /tmp/rkmpp
-          mkdir build && cd build
+          mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
             -DBUILD_TEST=OFF -DBUILD_SHARED_LIBS=ON ..
           make -j$(nproc)
@@ -79,11 +80,12 @@ jobs:
 
       - name: Build RGA (Jellyfin fork)
         run: |
+          rm -rf /tmp/rkrga
           git clone --depth 1 --branch jellyfin-rga-next \
             https://github.com/nyanmisaka/rk-mirrors.git /tmp/rkrga
           cd /tmp/rkrga
           sed -i 's/shared_library/library/g' meson.build
-          mkdir build && cd build
+          mkdir -p build && cd build
           meson setup --prefix=/usr --buildtype=release \
             -Dlibdrm=false -Dlibrga_demo=false ..
           ninja -j$(nproc)
@@ -93,6 +95,7 @@ jobs:
 
       - name: Build ffmpeg
         run: |
+          rm -rf /tmp/ffmpeg
           git clone --depth 1 --branch jellyfin \
             https://github.com/jellyfin/jellyfin-ffmpeg.git /tmp/ffmpeg
           cd /tmp/ffmpeg
@@ -123,6 +126,7 @@ jobs:
 
       - name: Package ffmpeg .deb
         run: |
+          mkdir -p /tmp/artifacts
           cd /tmp/ffmpeg
           sudo make install DESTDIR=/tmp/ffmpeg-deb
           mkdir -p /tmp/ffmpeg-deb/DEBIAN
@@ -141,6 +145,7 @@ jobs:
 
       - name: Build mpv
         run: |
+          rm -rf /tmp/mpv
           git clone --depth 1 --branch v0.40.0 \
             https://github.com/mpv-player/mpv.git /tmp/mpv
           cd /tmp/mpv
