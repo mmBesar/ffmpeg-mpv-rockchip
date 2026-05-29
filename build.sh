@@ -174,11 +174,13 @@ build_mpv() {
     info "Building mpv..."
     local mpv_src=/tmp/mpv-source
     [ -d "$mpv_src" ] && rm -rf "$mpv_src"
-    git clone --depth 1 --branch "$MPV_BRANCH" "$MPV_REPO" "$mpv_src"
-    cd "$mpv_src"
+    git init "$mpv_src" && cd "$mpv_src"
+    git remote add origin "$MPV_REPO"
+    git fetch --depth 1 origin "$MPV_BRANCH"
+    git checkout FETCH_HEAD
     meson setup build \
         -Dlibmpv=true -Dcplayer=true \
-        -Dlua=enabled -Dlibplacebo=disabled \
+        -Dlua=enabled \
         -Ddrm=enabled -Degl-drm=enabled \
         -Dx11=enabled -Dwayland=enabled \
         --buildtype=release --prefix=/usr/local

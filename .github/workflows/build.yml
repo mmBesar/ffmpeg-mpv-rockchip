@@ -146,12 +146,13 @@ jobs:
       - name: Build mpv
         run: |
           rm -rf /tmp/mpv
-          git clone --depth 1 --branch v0.40.0 \
-            https://github.com/mpv-player/mpv.git /tmp/mpv
-          cd /tmp/mpv
+          git init /tmp/mpv && cd /tmp/mpv
+          git remote add origin https://github.com/mpv-player/mpv.git
+          git fetch --depth 1 origin v0.40.0
+          git checkout FETCH_HEAD
           meson setup build \
             -Dlibmpv=true -Dcplayer=true \
-            -Dlua=enabled -Dlibplacebo=disabled \
+            -Dlua=enabled \
             -Ddrm=enabled -Degl-drm=enabled \
             -Dx11=enabled -Dwayland=enabled \
             --buildtype=release --prefix=/usr/local
