@@ -179,6 +179,13 @@ build_mpv() {
     git remote add origin "$MPV_REPO"
     git fetch --depth 1 origin "$MPV_BRANCH"
     git checkout FETCH_HEAD
+    # Fix FF_PROFILE_ -> AV_PROFILE_ rename in newer ffmpeg (jellyfin fork)
+    sed -i 's/\bFF_PROFILE_ARIB_PROFILE_A\b/AV_PROFILE_ARIB_PROFILE_A/g' \
+      demux/demux_mkv.c 2>/dev/null || true
+    sed -i 's/\bFF_PROFILE_ARIB_PROFILE_C\b/AV_PROFILE_ARIB_PROFILE_C/g' \
+      demux/demux_mkv.c 2>/dev/null || true
+    sed -i 's/\bFF_PROFILE_UNKNOWN\b/AV_PROFILE_UNKNOWN/g' \
+      demux/demux_mkv.c 2>/dev/null || true
     meson setup build \
         -Dlibmpv=true -Dcplayer=true \
         -Dlua=enabled \
