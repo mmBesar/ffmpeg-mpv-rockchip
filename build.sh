@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-SOURCE_DIR="$REPO_DIR/ffmpeg"
+SOURCE_DIR="/tmp/ffmpeg-source"
 JOBS=$(nproc)
 
 FFMPEG_REPO="https://github.com/jellyfin/jellyfin-ffmpeg.git"
