@@ -1,4 +1,4 @@
-name: Build ffmpeg + mpv with RK3588 HWA
+name: Build ffmpeg + mpv (RK3588 HWA)
 
 on:
   push:
@@ -8,11 +8,41 @@ on:
   workflow_dispatch:
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      already_built: ${{ steps.check.outputs.already_built }}
+      build_key: ${{ steps.check.outputs.build_key }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Resolve build key and check git tag ledger
+        id: check
+        run: |
+          MAIN_SHA=$(git rev-parse --short HEAD)
+          BUILD_KEY="${MAIN_SHA}"
+          echo "build_key=${BUILD_KEY}" >> "$GITHUB_OUTPUT"
+          if git ls-remote origin "refs/tags/built/${BUILD_KEY}" | grep -q .; then
+            echo "already_built=true" >> "$GITHUB_OUTPUT"
+            echo "Tag built/${BUILD_KEY} exists -- skipping."
+          else
+            echo "already_built=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: [check]
+    if: needs.check.outputs.already_built == 'false'
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+      packages: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          ref: main
 
       - name: Install dependencies
         run: |
@@ -29,26 +59,25 @@ jobs:
             libtheora-dev libwebp-dev \
             libzimg-dev libxml2-dev zlib1g-dev libssl-dev \
             libbluray-dev libopenmpt-dev libchromaprint-dev \
-            libfftw3-dev libzvibi-dev libsoxr-dev \
+            libfftw3-dev libzvbi-dev libsoxr-dev \
             liblzma-dev libbz2-dev libsnappy-dev libgmp-dev libgnutls28-dev \
             libwayland-dev libxpresent-dev libxext-dev libxrandr-dev \
             libxinerama-dev libxcursor-dev libxi-dev
 
-      - name: Build MPP from source (Jellyfin fork)
+      - name: Build MPP (Jellyfin fork)
         run: |
           git clone --depth 1 --branch jellyfin-mpp-next \
             https://github.com/nyanmisaka/rk-mirrors.git /tmp/rkmpp
           cd /tmp/rkmpp
           mkdir build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr \
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
             -DBUILD_TEST=OFF -DBUILD_SHARED_LIBS=ON ..
           make -j$(nproc)
           sudo make install
           echo "Libs.private: -lstdc++" | \
             sudo tee -a /usr/lib/aarch64-linux-gnu/pkgconfig/rockchip_mpp.pc
 
-      - name: Build RGA from source (Jellyfin fork)
+      - name: Build RGA (Jellyfin fork)
         run: |
           git clone --depth 1 --branch jellyfin-rga-next \
             https://github.com/nyanmisaka/rk-mirrors.git /tmp/rkrga
@@ -62,27 +91,18 @@ jobs:
           echo "Libs.private: -lstdc++" | \
             sudo tee -a /usr/lib/aarch64-linux-gnu/pkgconfig/librga.pc
 
-      - name: Clone Jellyfin ffmpeg
+      - name: Build ffmpeg
         run: |
           git clone --depth 1 --branch jellyfin \
-            https://github.com/jellyfin/jellyfin-ffmpeg.git /tmp/ffmpeg-source
-
-      - name: Apply patches
-        run: |
-          cd /tmp/ffmpeg-source
+            https://github.com/jellyfin/jellyfin-ffmpeg.git /tmp/ffmpeg
+          cd /tmp/ffmpeg
           while IFS= read -r patch; do
             echo "Applying: $patch"
             patch -p1 --forward < "debian/patches/$patch" || true
           done < debian/patches/series
-
-      - name: Configure ffmpeg
-        run: |
-          cd /tmp/ffmpeg-source
           ./configure \
-            --prefix=/usr/local \
-            --extra-version="rockchip-rk3588" \
-            --enable-shared \
-            --enable-gpl --enable-version3 \
+            --prefix=/usr/local --extra-version="rockchip-rk3588" \
+            --enable-shared --enable-gpl --enable-version3 \
             --disable-unstable --disable-ffplay \
             --disable-debug --disable-doc --disable-sdl2 \
             --disable-libxcb --disable-xlib \
@@ -99,22 +119,37 @@ jobs:
             --enable-libsoxr --enable-libzvbi \
             --enable-openssl --enable-libxml2 --enable-libsnappy \
             --enable-bzlib --enable-lzma --enable-zlib
-
-      - name: Build ffmpeg
-        run: |
-          cd /tmp/ffmpeg-source
           make -j$(nproc)
 
-      - name: Package ffmpeg artifacts
+      - name: Build mpv
         run: |
-          cd /tmp/ffmpeg-source
-          mkdir -p /tmp/artifacts
-          DESTDIR=/tmp/artifacts make install
-          cd /tmp/artifacts
-          tar cJf /tmp/ffmpeg-rockchip-linuxarm64-gpl.tar.xz .
+          git clone --depth 1 --branch v0.40.0 \
+            https://github.com/mpv-player/mpv.git /tmp/mpv
+          cd /tmp/mpv
+          meson setup build \
+            -Dlibmpv=true -Dcplayer=true \
+            -Dlua=enabled -Dlibplacebo=disabled \
+            -Ddrm=enabled -Degl-drm=enabled \
+            -Dx11=enabled -Dwayland=enabled \
+            --buildtype=release --prefix=/usr/local
+          ninja -C build -j$(nproc)
 
-      - name: Upload ffmpeg artifacts
+      - name: Package artifacts
+        run: |
+          mkdir -p /tmp/artifacts/usr/local
+          DESTDIR=/tmp/artifacts make -C /tmp/ffmpeg install
+          DESTDIR=/tmp/artifacts ninja -C /tmp/mpv/build install
+          cd /tmp/artifacts
+          tar cJf /tmp/ffmpeg-mpv-rockchip-linuxarm64-gpl.tar.xz .
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-rockchip-linuxarm64-gpl
-          path: /tmp/ffmpeg-rockchip-linuxarm64-gpl.tar.xz
+          name: ffmpeg-mpv-rockchip-linuxarm64-gpl
+          path: /tmp/ffmpeg-mpv-rockchip-linuxarm64-gpl.tar.xz
+
+      - name: Record build with git tag
+        if: github.event_name == 'push'
+        run: |
+          git tag "built/${{ needs.check.outputs.build_key }}"
+          git push origin "built/${{ needs.check.outputs.build_key }}"
