@@ -123,6 +123,7 @@ jobs:
             --enable-openssl --enable-libxml2 --enable-libsnappy \
             --enable-bzlib --enable-lzma --enable-zlib
           make -j$(nproc)
+          sudo make install
 
       - name: Package ffmpeg .deb
         run: |
