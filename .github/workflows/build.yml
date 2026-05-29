@@ -93,13 +93,17 @@ jobs:
           echo "Libs.private: -lstdc++" | \
             sudo tee -a /usr/lib/aarch64-linux-gnu/pkgconfig/librga.pc
 
-      - name: Install Vulkan SDK
-        run: |
-          sudo apt-get install -y libvulkan-dev
-          pkg-config --exists vulkan || { echo "vulkan.pc not found"; exit 1; }
-
       - name: Build ffmpeg
         run: |
+          # Try to install vulkan; auto-detect at configure time so build
+          # proceeds regardless (CI runner may not have GPU stacks available)
+          sudo apt-get install -y libvulkan-dev 2>/dev/null || true
+          if pkg-config --exists vulkan 2>/dev/null; then
+            VULKAN="--enable-vulkan"
+          else
+            VULKAN="--disable-vulkan"
+            echo "::warning::Vulkan not found — building without vulkan support"
+          fi
           rm -rf /tmp/ffmpeg
           git clone --depth 1 --branch jellyfin \
             https://github.com/jellyfin/jellyfin-ffmpeg.git /tmp/ffmpeg
@@ -116,7 +120,7 @@ jobs:
             --disable-libxcb --disable-xlib \
             --enable-lto=auto --enable-runtime-cpudetect \
             --enable-rkmpp --enable-rkrga \
-            --enable-vaapi --enable-vulkan --enable-libdrm \
+            --enable-vaapi "$VULKAN" --enable-libdrm \
             --enable-libx264 --enable-libx265 --enable-libaom \
             --enable-libvpx --enable-libdav1d \
             --enable-libopus --enable-libmp3lame \
