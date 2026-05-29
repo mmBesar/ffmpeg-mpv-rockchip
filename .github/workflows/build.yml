@@ -127,15 +127,15 @@ jobs:
           sudo make install DESTDIR=/tmp/ffmpeg-deb
           mkdir -p /tmp/ffmpeg-deb/DEBIAN
           cat > /tmp/ffmpeg-deb/DEBIAN/control <<'CONTROL'
-Package: ffmpeg-rockchip
-Version: 8.1.1
-Section: video
-Priority: optional
-Architecture: arm64
-Depends: libdrm2, libva2, libvulkan1, libx264-164, libx265-209, libvpx9, libdav1d7, libaom3, libopus0, libmp3lame0, libass9, libfreetype6, libfontconfig1, libfribidi0, libtheora0, libwebp7, libzimg2, libbluray2, libopenmpt0, libsoxr0, libzvbi0, libssl3, libxml2, libsnappy1v5, liblzma5, libbz2-1.0, zlib1g
-Maintainer: ffmpeg-rockchip
-Description: FFmpeg 8.1 with RK3588 hardware acceleration (rkmpp, rkrga, vaapi)
-CONTROL
+          Package: ffmpeg-rockchip
+          Version: 8.1.1
+          Section: video
+          Priority: optional
+          Architecture: arm64
+          Depends: libdrm2, libva2, libvulkan1, libx264-164, libx265-209, libvpx9, libdav1d7, libaom3, libopus0, libmp3lame0, libass9, libfreetype6, libfontconfig1, libfribidi0, libtheora0, libwebp7, libzimg2, libbluray2, libopenmpt0, libsoxr0, libzvbi0, libssl3, libxml2, libsnappy1v5, liblzma5, libbz2-1.0, zlib1g
+          Maintainer: ffmpeg-rockchip
+          Description: FFmpeg 8.1 with RK3588 hardware acceleration (rkmpp, rkrga, vaapi)
+          CONTROL
           sudo chown -R root:root /tmp/ffmpeg-deb
           sudo dpkg-deb --build /tmp/ffmpeg-deb /tmp/artifacts/ffmpeg-rockchip_8.1.1_arm64.deb
 
@@ -158,15 +158,15 @@ CONTROL
           sudo DESTDIR=/tmp/mpv-deb ninja -C build install
           mkdir -p /tmp/mpv-deb/DEBIAN
           cat > /tmp/mpv-deb/DEBIAN/control <<'CONTROL'
-Package: mpv-rockchip
-Version: 0.40.0
-Section: video
-Priority: optional
-Architecture: arm64
-Depends: ffmpeg-rockchip (= 8.1.1), libdrm2, libva2, libegl1, libwayland-client0, libx11-6
-Maintainer: mpv-rockchip
-Description: mpv v0.40.0 built against ffmpeg-rockchip with rkmpp HW decode
-CONTROL
+          Package: mpv-rockchip
+          Version: 0.40.0
+          Section: video
+          Priority: optional
+          Architecture: arm64
+          Depends: ffmpeg-rockchip (= 8.1.1), libdrm2, libva2, libegl1, libwayland-client0, libx11-6
+          Maintainer: mpv-rockchip
+          Description: mpv v0.40.0 built against ffmpeg-rockchip with rkmpp HW decode
+          CONTROL
           sudo chown -R root:root /tmp/mpv-deb
           sudo dpkg-deb --build /tmp/mpv-deb /tmp/artifacts/mpv-rockchip_0.40.0_arm64.deb
 
